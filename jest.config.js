@@ -2,6 +2,9 @@ module.exports = {
   testEnvironment: 'node',
   coveragePathIgnorePatterns: ['/node_modules/'],
   testMatch: ['**/tests/**/*.test.js'],
+  transform: {
+    '^.+\\.js$': 'babel-jest',
+  },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   collectCoverageFrom: [
     '**/*.js',

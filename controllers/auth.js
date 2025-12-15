@@ -1,13 +1,23 @@
-const { StatusCodes } = require('http-status-codes'); 
-const bcrypt = require('bcryptjs'); 
-const User = require('../models/User'); 
-const { UnauthenticatedError } = require('../errors/index');
+const { StatusCodes } = require('http-status-codes');
+const User = require('../models/User');
+const { UnauthenticatedError, BadRequestError } = require('../errors');
 
 //  handle user registration
 
 const register = async (req, res) => {
-// {name, email, password}
-  const user = await User.create({ ...req.body });
+  const { name, email, password } = req.body;
+  const hasMissingField = [name, email, password].some(
+    (value) => !value || `${value}`.trim() === ''
+  );
+  if (hasMissingField) {
+    throw new BadRequestError('Name, email, and password are required.');
+  }
+
+  const user = await User.create({
+    name: name.trim(),
+    email: email.trim(),
+    password,
+  });
   
   const token = user.createJWT();
   
@@ -17,6 +27,12 @@ const register = async (req, res) => {
 //  handle user login
 const login = async (req, res) => {
   const { email, password } = req.body; 
+  const hasMissingField = [email, password].some(
+    (value) => !value || `${value}`.trim() === ''
+  );
+  if (hasMissingField) {
+    throw new BadRequestError('Email and password are required.');
+  }
   
   const user = await User.findOne({ email });
   
