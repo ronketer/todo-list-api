@@ -31,66 +31,41 @@
  * If using local MongoDB, ensure it's running on the test URI
  */
 
-// Set test environment variables BEFORE any app imports
+// Set test environment variables before any app imports
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-secret-key-for-jwt-signing';
+process.env.JWT_LIFETIME = '30d';
 process.env.PORT = 3001;
 
-// MongoDB will be configured below with mongodb-memory-server
-// The MONGO_URI will be set in beforeAll() hook
-
-/**
- * Increase Jest timeout for API tests
- * Default timeout is 5000ms, but:
- * - Database operations may need more time
- * - Multiple requests in sequence need time
- * - Connection establishment may add latency
- */
-jest.setTimeout(30000);
-
-/**
- * Global setup: Run before all tests
- * Starts mongodb-memory-server for integration tests
- */
+const mongoose = require('mongoose');
 let mongoServer;
 
+// Allow slower CI environments
+jest.setTimeout(30000);
+
 beforeAll(async () => {
-  // Start in-memory MongoDB for testing
   const { MongoMemoryServer } = require('mongodb-memory-server');
-  
-  try {
-    mongoServer = await MongoMemoryServer.create();
-    const mongoUri = mongoServer.getUri();
-    process.env.MONGO_URI = mongoUri;
-    
-    console.log('✓ In-memory MongoDB started for tests');
-    console.log(`  URI: ${mongoUri}`);
-  } catch (error) {
-    console.error('Failed to start in-memory MongoDB:', error);
-    throw error;
+  mongoServer = await MongoMemoryServer.create();
+  const mongoUri = mongoServer.getUri();
+  process.env.MONGO_URI = mongoUri;
+
+  await mongoose.connect(mongoUri);
+  console.log('✓ In-memory MongoDB started for tests');
+});
+
+afterEach(async () => {
+  // Clean all collections between tests to keep isolation
+  const collections = mongoose.connection.collections;
+  for (const key of Object.keys(collections)) {
+    await collections[key].deleteMany();
   }
 });
 
-/**
- * Global teardown: Run after all tests
- * Stops in-memory MongoDB and closes Mongoose connections
- */
 afterAll(async () => {
-  try {
-    // Disconnect Mongoose from the in-memory database
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-    }
-    
-    // Stop the in-memory MongoDB server
-    if (mongoServer) {
-      await mongoServer.stop();
-      console.log('✓ In-memory MongoDB stopped');
-    }
-  } catch (error) {
-    console.error('Error during test cleanup:', error);
-    // Don't throw here - we want tests to exit even if cleanup fails
+  await mongoose.disconnect();
+  if (mongoServer) {
+    await mongoServer.stop();
+    console.log('✓ In-memory MongoDB stopped');
   }
 });
 
